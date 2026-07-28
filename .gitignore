@@ -1,0 +1,13 @@
+# Local runtime artifacts — never commit
+memory.db
+memory.db-*
+.tokens.json
+
+# Scaffolded demo repos (if created inside this repo)
+demo-repos/
+
+# Python
+__pycache__/
+*.pyc
+.venv/
+.pytest_cache/
