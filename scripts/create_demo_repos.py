@@ -2,9 +2,10 @@
 
 Each demo repo is a small, git-initialized project belonging to one team,
 with the `add-agent` skill BUILT IN (`.claude/skills/add-agent/SKILL.md`).
-Opening the repo in Claude Code and running /add-agent registers the
-repo's agent with the Recall service and wires the memory runtime loop
-into the repo's CLAUDE.md — the self-service onboarding story, live.
+Opening the repo in Claude Code and running /add-agent asks which agent
+to create, registers it with the Recall service, and writes a real
+Claude Code sub-agent (`.claude/agents/<id>.md`) with the memory runtime
+loop in its prompt — the self-service onboarding story, live.
 
 Usage:
   python scripts/create_demo_repos.py [--dest ../demo-repos]
@@ -74,15 +75,19 @@ def sync_vendor_inventory():
 
 SKILL_TEMPLATE = """---
 name: add-agent
-description: Wire this repository's AI agent into Recall, the shared agent memory service — register the agent identity, then add the memory runtime loop (bootstrap, search, distill-and-write) to this repo's CLAUDE.md. Use when asked to "add an agent", "set up memory", "connect to Recall", or "/add-agent".
+description: Create a new AI sub-agent for this repository and wire it into Recall, the shared agent memory service — ask which agent to create, register its identity, write the sub-agent definition under .claude/agents/, and record it in CLAUDE.md. Use when asked to "add an agent", "create an agent", "set up memory", "connect to Recall", or "/add-agent".
 ---
 
 You are performing the self-service **add-agent** integration for this
 repository. In production this skill authenticates the developer via an
 SSO device flow and calls Recall's registration endpoint; this demo
 simulates that with a local registration script. Everything else — the
-scaffolded runtime loop, the credential handling rules — is the real
-pattern.
+interactive agent creation, the scaffolded sub-agent with its memory
+runtime loop, the credential handling rules — is the real pattern.
+
+The deliverable of this skill is a **working sub-agent**: a file under
+`.claude/agents/` that Claude Code can delegate to, with Recall memory
+built into its prompt. Registration alone is not a successful run.
 
 ## Steps
 
@@ -90,7 +95,8 @@ pattern.
 
 Read `.recall/config.json` in this repository. It contains:
 `service_url`, `recall_repo` (path to the Recall service checkout),
-`user`, `team`, `agent_id`, `profile_tags`, `profile_kinds`.
+`user`, `team`, `agent_id` (the suggested default agent for this repo),
+`profile_tags`, `profile_kinds`.
 
 ### 2. Check the service is up
 
@@ -98,43 +104,84 @@ Read `.recall/config.json` in this repository. It contains:
 start it (`cd <recall_repo> && .venv/bin/uvicorn memory_service.main:app
 --port 8000`) and stop here.
 
-### 3. Register the agent (simulated SSO)
+### 3. Ask which agent to create
+
+Do NOT assume the config's `agent_id` — ask. Use the AskUserQuestion
+tool with options like:
+
+- **`<agent_id>` (repo default)** — this repo's general assistant, using
+  the profile tags/kinds from the config.
+- **Code reviewer** — reviews diffs against team conventions and past
+  decisions. Suggested id: `<team-prefix>-code-reviewer`, kinds
+  `decision,convention`.
+- **Incident analyst** — investigates failures using past lessons.
+  Suggested id: `<team-prefix>-incident-analyst`, kinds `lesson,decision`.
+- **Custom** — ask for a short purpose, then derive the id, tags, and
+  kinds from it.
+
+Derive `<team-prefix>` from the config's `agent_id` (e.g. `gw` from
+`gw-assistant`). Before moving on, state the chosen id, role, tags, and
+kinds in one line so the user can object.
+
+If a sub-agent file for the chosen id already exists in
+`.claude/agents/`, say so and ask whether to update it or pick a
+different id.
+
+### 4. Register the agent (simulated SSO)
 
 Run, with the Recall repo as working directory:
 
 ```bash
 <recall_repo>/.venv/bin/python scripts/add_agent.py \\
-    --user <user> --agent <agent_id> \\
-    --tags "<profile_tags>" --kinds <profile_kinds>
+    --user <user> --agent <chosen_agent_id> \\
+    --name "<chosen role name>" \\
+    --tags "<chosen tags>" --kinds <chosen kinds>
 ```
 
-If it reports the agent already exists, that's fine — continue.
+If it reports the agent already exists, that's fine — the token is
+already in the tokens file; continue to step 5 and create the sub-agent
+anyway.
 
 **Credential rules (non-negotiable):**
 - The token lands in `<recall_repo>/.tokens.json` (gitignored, chmod 600).
 - NEVER print the token, paste it into chat, or write it into any file in
-  THIS repo — not CLAUDE.md, not .env, not configs. Every example below
-  reads it from the tokens file at call time.
+  THIS repo — not the sub-agent file, not CLAUDE.md, not .env, not
+  configs. Every example below reads it from the tokens file at call time.
 
-### 4. Wire the runtime loop into CLAUDE.md
+### 5. Create the sub-agent
 
-Append the following section to this repo's `CLAUDE.md` (create the file
-if missing; skip if the section already exists). Replace the
-placeholders with values from the config — but keep `$(...)` token
-lookups exactly as-is so the credential is resolved at call time, never
-stored:
+Write `.claude/agents/<chosen_agent_id>.md` in THIS repository (create
+the directory if missing). Fill the placeholders from the config and the
+user's choices — but keep the `$(...)` token lookup exactly as-is so the
+credential is resolved at call time, never stored.
+
+In the `tools:` line, grant only what the role needs — a reviewer or
+analyst gets read-only tools (`Read, Grep, Glob, Bash`); add
+`Edit, Write` only for a role that must change files. Never grant
+all tools.
 
 ~~~markdown
-## Shared memory (Recall)
+---
+name: <chosen_agent_id>
+description: <One line — the role and when to delegate to it.> Has shared team memory via Recall; use it for tasks where past team decisions and lessons matter.
+tools: <minimal tool list for the role>
+---
 
-This repo's agent (`<agent_id>`, user `<user>`, team `<team>`) has shared
-memory. Use it every session:
+You are `<chosen_agent_id>`, the <role> for this repository
+(user `<user>`, team `<team>`).
+
+## Role
+
+<2–4 sentences describing what this agent does, derived from the
+user's chosen purpose.>
+
+## Shared memory (Recall) — your runtime loop
 
 **Session start — bootstrap (profile-shaped):**
 ```bash
 # call-time credential lookup — the value is never echoed or stored
 TOKEN=$(python3 -c "import json,sys;sys.stdout.write(json.load(open(sys.argv[1]))[sys.argv[2]])" \\
-        <recall_repo>/.tokens.json <agent_id>)
+        <recall_repo>/.tokens.json <chosen_agent_id>)
 curl -s -H "Authorization: Bearer $TOKEN" <service_url>/v1/memories/bootstrap
 ```
 
@@ -161,16 +208,34 @@ Rules:
   commit credential values.
 ~~~
 
-### 5. Smoke test
+### 6. Record the agent in CLAUDE.md
 
-Call `/v1/whoami` (same token lookup) and confirm the expected user,
-agent, and team; then run the bootstrap call once. An empty bootstrap on
-a fresh install is expected — say so rather than treating it as an error.
+In this repo's `CLAUDE.md` (create if missing), make sure a
+`## Recall agents` section exists and add one bullet for the new agent
+(skip if already listed):
 
-### 6. Report
+```markdown
+## Recall agents
 
-Summarize: agent registered (id, user, team), CLAUDE.md wired, smoke test
-result, and remind the user the agent will now remember across sessions.
+Sub-agents in `.claude/agents/` with shared team memory via Recall
+(team `<team>`). Run `/add-agent` to create another.
+
+- `<chosen_agent_id>` — <role, one line>
+```
+
+### 7. Smoke test
+
+Call `/v1/whoami` (same call-time token lookup as in the sub-agent file)
+and confirm the expected user, agent, and team; then run the bootstrap
+call once. An empty bootstrap on a fresh install is expected — say so
+rather than treating it as an error.
+
+### 8. Report
+
+Summarize: which agent was created (id, role, user, team), the sub-agent
+file path, CLAUDE.md updated, smoke test result — and remind the user
+they can invoke the agent by mentioning it in Claude Code, and that it
+will remember across sessions.
 """
 
 CLAUDE_MD_TEMPLATE = """# {title}
@@ -180,8 +245,9 @@ CLAUDE_MD_TEMPLATE = """# {title}
 Team: **{team}** · Demo repo for the Recall shared-agent-memory prototype.
 
 This repository has the **add-agent** skill built in: run `/add-agent` in
-Claude Code to register this repo's agent with Recall and wire the memory
-runtime loop into this file.
+Claude Code to create a sub-agent for this repo — it asks which agent you
+want, registers it with Recall, and writes the agent definition (with the
+memory runtime loop) under `.claude/agents/`.
 """
 
 README_TEMPLATE = """# {title}

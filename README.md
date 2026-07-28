@@ -133,10 +133,12 @@ Each demo repo is a small git-initialized project with the **`add-agent`
 skill built in** (`.claude/skills/add-agent/SKILL.md`) and a
 `.recall/config.json` pointing back at this service. Opening a demo repo
 in Claude Code and running `/add-agent` performs the self-service
-onboarding from doc 07: registers the repo's agent (simulated SSO), wires
-the runtime loop (bootstrap → search → distill-and-write) into the repo's
-`CLAUDE.md` with call-time credential lookups (token values are never
-written into the demo repo), and smoke-tests the connection. Watching the
+onboarding from doc 07: asks which agent to create, registers it
+(simulated SSO), and writes a real Claude Code sub-agent
+(`.claude/agents/<id>.md`) whose prompt carries the runtime loop
+(bootstrap → search → distill-and-write) with call-time credential
+lookups (token values are never written into the demo repo), then
+smoke-tests the connection. Watching the
 skill do this — then watching the two repos' agents share knowledge
 through the promotion loop — is the live demo.
 

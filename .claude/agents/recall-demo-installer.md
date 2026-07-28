@@ -78,9 +78,10 @@ This creates two small, git-initialized team repositories:
 
 Each contains toy source code, a `CLAUDE.md`, a `.recall/config.json`
 pointing back at this Recall repo, and — the important part —
-`.claude/skills/add-agent/SKILL.md`: the built-in skill that registers the
-repo's agent with Recall and wires the memory runtime loop into the
-repo's `CLAUDE.md`.
+`.claude/skills/add-agent/SKILL.md`: the built-in skill that asks which
+agent to create, registers it with Recall, and writes the sub-agent
+definition (with the memory runtime loop) under the repo's
+`.claude/agents/`.
 
 If `--dest` already exists, the script refuses rather than overwrite;
 report that instead of forcing it.
