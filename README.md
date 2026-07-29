@@ -135,6 +135,11 @@ installation from a cold start: dependencies, test verification, seeded
 directory, running service, and **two scaffolded demo team repositories**.
 Open this repo in Claude Code and ask it to *"set up the demo"*.
 
+After the installer finishes, ask Claude to **run the UI**, then open the
+demo runbook at **http://localhost:8000/ui/runbook** and follow the
+instructions there — it walks you through the live demo step by step
+(the console itself lives at http://localhost:8000/ui).
+
 The scaffolder it uses is deterministic and can be run directly:
 
 ```bash
