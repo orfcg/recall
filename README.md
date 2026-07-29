@@ -56,38 +56,42 @@ environment/keychain; the prototype mints local demo tokens
 (`scripts/add_agent.py`), stores only SHA-256 hashes, and writes plaintext
 to a gitignored, chmod-600 `.tokens.json` as a stand-in for the keychain.
 
-## Run it locally
+## The demo installer sub-agent
 
-Requires Python 3.11+.
+The repo ships a Claude Code sub-agent —
+`.claude/agents/recall-demo-installer.md` — that performs the whole
+installation from a cold start: dependencies, test verification, seeded
+directory, running service, and **two scaffolded demo team repositories**.
+Open this repo in Claude Code and ask it to *"set up the demo"*.
+
+After the installer finishes, ask Claude to **run the UI**, then open the
+demo runbook at **http://localhost:8000/ui/runbook** and follow the
+instructions there — it walks you through the live demo step by step
+(the console itself lives at http://localhost:8000/ui).
+
+The scaffolder it uses is deterministic and can be run directly:
 
 ```bash
-cd repo
-python3 -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-
-# 1. Seed the org directory (simulates the IdP: teams, users, memberships)
-python scripts/seed.py
-
-# 2. Register agents — simulates the self-service add-agent skill.
-#    Note bob belongs to TWO teams, and the on-call agent has a
-#    relevance profile that shapes its session bootstrap.
-python scripts/add_agent.py --user alice --agent gw-code-reviewer \
-    --name "Gateway Code Review Agent"
-python scripts/add_agent.py --user bob --agent gw-oncall-helper \
-    --name "Gateway On-call Agent" \
-    --tags "retries incidents upstream vendor" --kinds decision,lesson
-python scripts/add_agent.py --user carol --agent mgmt-code-reviewer \
-    --name "Management Code Review Agent"
-
-# 3. Start the service
-uvicorn memory_service.main:app --port 8000
+python scripts/create_demo_repos.py --dest ../demo-repos
 ```
 
-In a second terminal (same venv):
+| Demo repo | Team | User | Suggested agent |
+|---|---|---|---|
+| `demo-repos/gateway-service` | sase-gateway | alice | gw-assistant |
+| `demo-repos/mgmt-portal` | sase-management | carol | mgmt-assistant |
 
-```bash
-# 4. The demo flow — five acts, with assertions that crash on any leak
-python scripts/demo.py
+Each demo repo is a small git-initialized project with the **`add-agent`
+skill built in** (`.claude/skills/add-agent/SKILL.md`) and a
+`.recall/config.json` pointing back at this service. Opening a demo repo
+in Claude Code and running `/add-agent` performs the self-service
+onboarding from doc 07: asks which agent to create, registers it
+(simulated SSO), and writes a real Claude Code sub-agent
+(`.claude/agents/<id>.md`) whose prompt carries the runtime loop
+(bootstrap → search → distill-and-write) with call-time credential
+lookups (token values are never written into the demo repo), then
+smoke-tests the connection. Watching the
+skill do this — then watching the two repos' agents share knowledge
+through the promotion loop — is the live demo.
 ```
 
 ### The demo flow
@@ -126,43 +130,6 @@ the viewer must be a seeded directory user. `resolve_viewer` in
 `memory_service/ui.py` is the seam where the production login
 (SSO/OIDC with users and roles) plugs in later without touching any
 query; the console itself performs no writes, promotions, or deletes.
-
-## The demo installer sub-agent
-
-The repo ships a Claude Code sub-agent —
-`.claude/agents/recall-demo-installer.md` — that performs the whole
-installation from a cold start: dependencies, test verification, seeded
-directory, running service, and **two scaffolded demo team repositories**.
-Open this repo in Claude Code and ask it to *"set up the demo"*.
-
-After the installer finishes, ask Claude to **run the UI**, then open the
-demo runbook at **http://localhost:8000/ui/runbook** and follow the
-instructions there — it walks you through the live demo step by step
-(the console itself lives at http://localhost:8000/ui).
-
-The scaffolder it uses is deterministic and can be run directly:
-
-```bash
-python scripts/create_demo_repos.py --dest ../demo-repos
-```
-
-| Demo repo | Team | User | Suggested agent |
-|---|---|---|---|
-| `demo-repos/gateway-service` | sase-gateway | alice | gw-assistant |
-| `demo-repos/mgmt-portal` | sase-management | carol | mgmt-assistant |
-
-Each demo repo is a small git-initialized project with the **`add-agent`
-skill built in** (`.claude/skills/add-agent/SKILL.md`) and a
-`.recall/config.json` pointing back at this service. Opening a demo repo
-in Claude Code and running `/add-agent` performs the self-service
-onboarding from doc 07: asks which agent to create, registers it
-(simulated SSO), and writes a real Claude Code sub-agent
-(`.claude/agents/<id>.md`) whose prompt carries the runtime loop
-(bootstrap → search → distill-and-write) with call-time credential
-lookups (token values are never written into the demo repo), then
-smoke-tests the connection. Watching the
-skill do this — then watching the two repos' agents share knowledge
-through the promotion loop — is the live demo.
 
 ## API
 
