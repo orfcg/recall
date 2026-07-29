@@ -1,0 +1,622 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recall · demo console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Spline+Sans+Mono:wght@400;500;600&family=Spline+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:          #0c1210;
+    --panel:       #131b18;
+    --panel-2:     #182420;
+    --line:        rgba(236, 243, 238, 0.09);
+    --line-strong: rgba(236, 243, 238, 0.16);
+    --ink:         #ecf3ee;
+    --ink-2:       #aebfb6;
+    --muted:       #75897e;
+    /* validated on --panel (dark): team/global pass all six checks;
+       demand is the reserved status-serious step, never a series color */
+    --scope-team:   #3987e5;
+    --scope-global: #c98500;
+    --demand:       #ec835a;
+    --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --mono:  "Spline Sans Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:  "Spline Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body { margin: 0; }
+
+  body {
+    background:
+      radial-gradient(1100px 500px at 12% -8%, rgba(57, 135, 101, 0.10), transparent 60%),
+      radial-gradient(900px 600px at 105% 12%, rgba(201, 133, 0, 0.05), transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 14.5px;
+    line-height: 1.5;
+    min-height: 100vh;
+  }
+
+  /* film grain, sits above the gradients, below the content */
+  body::before {
+    content: "";
+    position: fixed; inset: 0;
+    pointer-events: none;
+    z-index: 0;
+    opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .frame { position: relative; z-index: 1; max-width: 1240px; margin: 0 auto; padding: 28px 32px 80px; }
+
+  /* ---------- header ---------- */
+
+  header {
+    display: flex; align-items: flex-end; justify-content: space-between;
+    gap: 24px; flex-wrap: wrap;
+    padding-bottom: 18px;
+    border-bottom: 1px solid var(--line-strong);
+  }
+
+  .wordmark {
+    font-family: var(--serif); font-style: italic;
+    font-size: 44px; line-height: 1; letter-spacing: 0.01em;
+  }
+  .wordmark::after { content: "."; color: var(--scope-global); font-style: normal; }
+
+  .tagline {
+    display: block; margin-top: 6px;
+    font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+
+  .header-right { display: flex; align-items: center; gap: 22px; flex-wrap: wrap; }
+
+  .live { display: flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-2); }
+  .live .dot { width: 8px; height: 8px; border-radius: 50%; background: #0ca30c; animation: pulse 2.2s ease-in-out infinite; }
+  .live.off .dot { background: var(--demand); animation: none; }
+  @keyframes pulse { 0%, 100% { box-shadow: 0 0 0 0 rgba(12, 163, 12, 0.5); } 55% { box-shadow: 0 0 0 6px rgba(12, 163, 12, 0); } }
+
+  .viewer-select { display: flex; align-items: center; gap: 10px; }
+  .vs-label { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; }
+  .chip {
+    font-family: var(--mono); font-size: 12.5px;
+    padding: 5px 12px; border-radius: 999px;
+    border: 1px solid var(--line-strong); background: transparent;
+    color: var(--ink-2); cursor: pointer;
+    transition: color .15s, border-color .15s, background .15s;
+  }
+  .chip:hover { color: var(--ink); border-color: var(--ink-2); }
+  .chip.on { color: var(--bg); background: var(--ink); border-color: var(--ink); font-weight: 600; }
+
+  /* ---------- layout ---------- */
+
+  .layout { display: grid; grid-template-columns: 264px 1fr; gap: 40px; margin-top: 30px; }
+  @media (max-width: 900px) { .layout { grid-template-columns: 1fr; } .rail { position: static; } }
+
+  .rail { position: sticky; top: 24px; align-self: start; display: flex; flex-direction: column; gap: 14px; }
+
+  .viewer-card {
+    border: 1px solid var(--line-strong); border-radius: 10px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    padding: 14px 16px;
+  }
+  .viewer-card .who { font-family: var(--serif); font-size: 24px; }
+  .viewer-card .vteams { margin-top: 4px; font-family: var(--mono); font-size: 12px; color: var(--ink-2); }
+  .viewer-card .note { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+
+  .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .tile {
+    border: 1px solid var(--line); border-radius: 10px;
+    background: var(--panel); padding: 12px 14px 10px;
+  }
+  .tile .v { font-family: var(--serif); font-size: 30px; line-height: 1.05; }
+  .tile .k { margin-top: 2px; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); }
+  .tile .mark { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; vertical-align: baseline; }
+
+  .legend { border: 1px solid var(--line); border-radius: 10px; background: var(--panel); padding: 12px 14px; font-size: 12.5px; color: var(--ink-2); }
+  .legend .row { display: flex; align-items: center; gap: 8px; margin: 4px 0; }
+  .legend .swatch { width: 10px; height: 10px; border-radius: 3px; flex: none; }
+
+  .rail-foot { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.06em; color: var(--muted); padding: 0 4px; }
+
+  /* ---------- sections ---------- */
+
+  main section { margin-bottom: 46px; }
+
+  h2 {
+    display: flex; align-items: baseline; gap: 12px;
+    font-family: var(--serif); font-weight: 400; font-size: 26px;
+    margin: 0 0 14px; padding-bottom: 8px;
+    border-bottom: 1px solid var(--line);
+  }
+  h2 .idx { font-family: var(--mono); font-size: 12px; color: var(--muted); letter-spacing: 0.08em; }
+  h2 .count { font-family: var(--mono); font-size: 12.5px; color: var(--muted); margin-left: auto; }
+
+  .empty {
+    border: 1px dashed var(--line-strong); border-radius: 10px;
+    padding: 22px; color: var(--muted); font-size: 13.5px;
+  }
+  .empty b { color: var(--ink-2); font-weight: 500; }
+  .empty code { font-family: var(--mono); font-size: 12.5px; color: var(--ink-2); }
+
+  /* agents */
+  .agents { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 12px; }
+  .agent {
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    padding: 15px 16px; transition: transform .18s ease, border-color .18s ease;
+  }
+  .agent:hover { transform: translateY(-2px); border-color: var(--line-strong); }
+  .agent .aname { font-family: var(--serif); font-size: 20px; }
+  .agent .aid { font-family: var(--mono); font-size: 12px; color: var(--scope-team); margin-top: 1px; }
+  .agent .ameta { margin-top: 8px; font-size: 12.5px; color: var(--ink-2); }
+  .agent .ameta .mut { color: var(--muted); }
+  .agent .atags { margin-top: 9px; display: flex; flex-wrap: wrap; gap: 5px; }
+  .tag {
+    font-family: var(--mono); font-size: 11px; color: var(--ink-2);
+    border: 1px solid var(--line); border-radius: 5px; padding: 2px 7px;
+  }
+  .agent .astat { margin-top: 10px; padding-top: 9px; border-top: 1px solid var(--line); font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .agent .astat b { color: var(--ink); font-weight: 600; }
+
+  /* memories */
+  .filters { display: flex; gap: 6px; margin-bottom: 12px; }
+  .memories { display: flex; flex-direction: column; gap: 9px; }
+  .mem {
+    border: 1px solid var(--line); border-left-width: 3px; border-radius: 8px;
+    background: var(--panel); padding: 12px 16px 11px;
+  }
+  .mem.scope-team   { border-left-color: var(--scope-team); }
+  .mem.scope-global { border-left-color: var(--scope-global); }
+  .mem.new { animation: arrive 1.6s ease-out; }
+  @keyframes arrive {
+    0%   { background: rgba(201, 133, 0, 0.14); }
+    100% { background: var(--panel); }
+  }
+  .mem .top { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 6px; }
+  .pill {
+    display: inline-flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--ink-2); border: 1px solid var(--line); border-radius: 999px; padding: 2px 9px;
+  }
+  .pill .swatch { width: 7px; height: 7px; border-radius: 50%; }
+  .pill.kind { color: var(--muted); }
+  .mem .when { margin-left: auto; font-family: var(--mono); font-size: 11px; color: var(--muted); }
+  .mem .content { font-size: 14px; color: var(--ink); }
+  .mem .meta { margin-top: 7px; font-family: var(--mono); font-size: 11.5px; color: var(--muted); display: flex; gap: 14px; flex-wrap: wrap; }
+  .mem .meta .prov b { color: var(--ink-2); font-weight: 500; }
+  .mem .promoted { color: var(--scope-global); }
+
+  /* suggestions */
+  .sugs { display: flex; flex-direction: column; gap: 12px; }
+  .sug {
+    display: grid; grid-template-columns: 84px 1fr; gap: 16px;
+    border: 1px solid var(--line); border-radius: 10px;
+    background: linear-gradient(180deg, var(--panel-2), var(--panel));
+    padding: 16px 18px;
+  }
+  .sug .demand-count { text-align: center; align-self: center; }
+  .sug .demand-count .n { font-family: var(--serif); font-size: 40px; line-height: 1; }
+  .sug .demand-count .l { font-family: var(--mono); font-size: 9.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--demand); margin-top: 3px; }
+  .sug .scontent { font-size: 14px; }
+  .sug .srow { margin-top: 9px; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-family: var(--mono); font-size: 11.5px; color: var(--muted); }
+  .sug .team-chip {
+    font-family: var(--mono); font-size: 11px; border-radius: 5px; padding: 2px 8px;
+    border: 1px solid rgba(236, 131, 90, 0.45); color: var(--demand);
+  }
+  .sug .hint { margin-top: 9px; padding-top: 8px; border-top: 1px solid var(--line); font-size: 12px; color: var(--muted); }
+  .sug .hint code { font-family: var(--mono); font-size: 11.5px; color: var(--ink-2); }
+
+  /* approver-only: the approve & promote flow */
+  .sug .approve { margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--line); }
+  .sug .approve .alabel { font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); margin-bottom: 6px; }
+  .sug .approve textarea {
+    width: 100%; min-height: 64px; resize: vertical;
+    background: var(--bg); color: var(--ink);
+    border: 1px solid var(--line-strong); border-radius: 8px;
+    padding: 8px 10px; font-family: var(--sans); font-size: 13px; line-height: 1.45;
+  }
+  .sug .approve textarea:focus { outline: none; border-color: var(--scope-global); }
+  .sug .approve .arow { margin-top: 8px; display: flex; align-items: center; gap: 10px; }
+  .chip.approve-btn { border-color: rgba(201, 133, 0, 0.55); color: var(--scope-global); }
+  .chip.approve-btn:hover { background: var(--scope-global); color: var(--bg); border-color: var(--scope-global); }
+  .chip.approve-btn:disabled { opacity: 0.5; cursor: default; }
+  .approve-msg { font-family: var(--mono); font-size: 11.5px; color: var(--demand); }
+  .badge-approver {
+    display: inline-block; margin-top: 8px;
+    font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.09em; text-transform: uppercase;
+    color: var(--scope-global); border: 1px solid rgba(201, 133, 0, 0.5);
+    border-radius: 999px; padding: 2px 9px;
+  }
+
+  /* load-in */
+  .reveal { animation: rise .5s ease-out both; }
+  .reveal:nth-child(2) { animation-delay: .05s; }
+  .reveal:nth-child(3) { animation-delay: .1s; }
+  .reveal:nth-child(4) { animation-delay: .15s; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  ::selection { background: rgba(201, 133, 0, 0.35); }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <div>
+      <span class="wordmark">Recall</span>
+      <span class="tagline">scoped agent memory &mdash; demo console</span>
+    </div>
+    <div class="header-right">
+      <a class="chip" href="/ui/runbook" style="text-decoration:none">runbook &rarr;</a>
+      <div class="live" id="live"><span class="dot"></span><span id="live-label">live</span></div>
+      <div class="viewer-select">
+        <span class="vs-label">view as</span>
+        <div class="chips" id="viewer-chips"></div>
+      </div>
+    </div>
+  </header>
+
+  <div class="layout">
+    <aside class="rail">
+      <div class="viewer-card reveal" id="viewer-card"></div>
+      <div class="tiles reveal" id="tiles"></div>
+      <div class="legend reveal">
+        <div class="row"><span class="swatch" style="background:var(--scope-team)"></span> team scope &mdash; owning team only</div>
+        <div class="row"><span class="swatch" style="background:var(--scope-global)"></span> global scope &mdash; promoted, org-visible</div>
+        <div class="row"><span class="swatch" style="background:var(--demand)"></span> demand &mdash; blocked cross-team hits</div>
+      </div>
+      <div class="rail-foot reveal">the same visibility predicate as the agent API, evaluated as the selected user &middot; one governed write: promotion approval (ai-acceleration only)</div>
+    </aside>
+
+    <main>
+      <section id="sec-agents">
+        <h2><span class="idx">01</span>Agents<span class="count" id="agent-count"></span></h2>
+        <div class="agents" id="agents"></div>
+      </section>
+
+      <section id="sec-memories">
+        <h2><span class="idx">02</span>Memories<span class="count" id="mem-count"></span></h2>
+        <div class="filters chips" id="scope-filters"></div>
+        <div class="memories" id="memories"></div>
+      </section>
+
+      <section id="sec-suggestions">
+        <h2><span class="idx">03</span>Promotion digest<span class="count" id="sug-count"></span></h2>
+        <div class="sugs" id="suggestions"></div>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+"use strict";
+
+/* All dynamic values are rendered through textContent (el() below) —
+   memory content is agent-written and must never be treated as HTML. */
+
+const POLL_MS = 4000;
+const state = { viewer: null, scopeFilter: "all", seen: new Set(), first: true };
+
+const $ = (id) => document.getElementById(id);
+
+function el(tag, cls, text) {
+  const n = document.createElement(tag);
+  if (cls) n.className = cls;
+  if (text !== undefined && text !== null) n.textContent = String(text);
+  return n;
+}
+
+function relTime(iso) {
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return iso;
+  const s = Math.max(0, (Date.now() - t) / 1000);
+  if (s < 60) return "just now";
+  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
+  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
+  return `${Math.floor(s / 86400)}d ago`;
+}
+
+function setLive(ok, label) {
+  $("live").classList.toggle("off", !ok);
+  $("live-label").textContent = label;
+}
+
+/* ---------- viewer selection ---------- */
+
+async function loadDirectory() {
+  const res = await fetch("/ui/api/directory");
+  if (!res.ok) throw new Error(`directory ${res.status}`);
+  const dir = await res.json();
+  const saved = localStorage.getItem("recall-viewer");
+  const ids = dir.users.map((u) => u.id);
+  state.viewer = ids.includes(saved) ? saved : ids[0];
+
+  const chips = $("viewer-chips");
+  chips.replaceChildren(...dir.users.map((u) => {
+    const b = el("button", "chip", u.id);
+    b.title = `${u.name} — ${u.teams.join(", ") || "no teams"}`;
+    b.addEventListener("click", () => {
+      state.viewer = u.id;
+      localStorage.setItem("recall-viewer", u.id);
+      state.seen = new Set();
+      state.first = true;
+      markViewerChips();
+      refresh();
+    });
+    return b;
+  }));
+  markViewerChips();
+}
+
+function markViewerChips() {
+  for (const c of $("viewer-chips").children)
+    c.classList.toggle("on", c.textContent === state.viewer);
+}
+
+/* ---------- rendering ---------- */
+
+function renderViewerCard(v) {
+  const card = $("viewer-card");
+  card.replaceChildren(
+    el("div", "who", v.name),
+    el("div", "vteams", v.teams.length ? v.teams.join(" · ") : "no team memberships"),
+  );
+  if (v.can_approve) card.append(el("div", "badge-approver", "promotion approver"));
+  card.append(el("div", "note", v.can_approve
+    ? "This user reviews the org-wide promotion queue and can approve promotions."
+    : "Everything below is what this user's agents can see."));
+}
+
+function tile(value, label, markColor) {
+  const t = el("div", "tile");
+  t.append(el("div", "v", value));
+  const k = el("div", "k");
+  if (markColor) {
+    const m = el("span", "mark");
+    m.style.background = markColor;
+    k.append(m);
+  }
+  k.append(document.createTextNode(label));
+  t.append(k);
+  return t;
+}
+
+function renderTiles(data) {
+  const mems = data.memories;
+  const team = mems.filter((m) => m.scope === "team").length;
+  const glob = mems.filter((m) => m.scope === "global").length;
+  $("tiles").replaceChildren(
+    tile(data.agents.length, "agents"),
+    tile(mems.length, "visible memories"),
+    tile(team, "team scope", "var(--scope-team)"),
+    tile(glob, "global scope", "var(--scope-global)"),
+    tile(data.suggestions.length, "promotion candidates", "var(--demand)"),
+  );
+}
+
+function renderAgents(data) {
+  const byAgent = new Map();
+  for (const m of data.memories)
+    byAgent.set(m.agent_id, (byAgent.get(m.agent_id) || 0) + 1);
+
+  $("agent-count").textContent = `${data.agents.length} registered`;
+  const box = $("agents");
+  if (!data.agents.length) {
+    const e = el("div", "empty");
+    e.append("No agents registered yet — run ", el("code", null, "/add-agent"),
+             " in a demo repo.");
+    box.replaceChildren(e);
+    return;
+  }
+  box.replaceChildren(...data.agents.map((a) => {
+    const card = el("div", "agent");
+    card.append(el("div", "aname", a.name), el("div", "aid", a.id));
+
+    const meta = el("div", "ameta");
+    meta.append(el("span", "mut", "runs as "),
+                document.createTextNode(`${a.user_id} · ${a.teams.join(", ") || "no teams"}`));
+    card.append(meta);
+
+    const tags = (a.profile_tags || "").split(/\s+/).filter(Boolean);
+    const kinds = (a.profile_kinds || "").split(",").map((s) => s.trim()).filter(Boolean);
+    if (tags.length || kinds.length) {
+      const row = el("div", "atags");
+      row.append(...tags.map((t) => el("span", "tag", t)),
+                 ...kinds.map((k) => el("span", "tag", `kind:${k}`)));
+      card.append(row);
+    }
+
+    const stat = el("div", "astat");
+    const n = byAgent.get(a.id) || 0;
+    stat.append(el("b", null, n), ` ${n === 1 ? "memory" : "memories"} visible to ${state.viewer}`);
+    card.append(stat);
+    return card;
+  }));
+}
+
+function scopePill(scope) {
+  const p = el("span", "pill");
+  const s = el("span", "swatch");
+  s.style.background = scope === "global" ? "var(--scope-global)" : "var(--scope-team)";
+  p.append(s, document.createTextNode(scope));
+  return p;
+}
+
+function renderScopeFilters() {
+  $("scope-filters").replaceChildren(...["all", "team", "global"].map((f) => {
+    const b = el("button", "chip" + (state.scopeFilter === f ? " on" : ""), f);
+    b.addEventListener("click", () => { state.scopeFilter = f; refresh(); });
+    return b;
+  }));
+}
+
+function renderMemories(data) {
+  const all = data.memories;
+  const shown = all.filter((m) => state.scopeFilter === "all" || m.scope === state.scopeFilter);
+  $("mem-count").textContent =
+    state.scopeFilter === "all" ? `${all.length} visible` : `${shown.length} of ${all.length} visible`;
+
+  const box = $("memories");
+  if (!shown.length) {
+    const e = el("div", "empty");
+    if (!all.length) {
+      e.append(el("b", null, "Nothing visible to this user yet. "),
+               "Memories appear here the moment an agent distills one — ",
+               "or the walls are doing their job and another team owns them all.");
+    } else {
+      e.append("No ", el("b", null, state.scopeFilter), "-scoped memories right now.");
+    }
+    box.replaceChildren(e);
+    return;
+  }
+
+  box.replaceChildren(...shown.map((m) => {
+    const row = el("article", `mem scope-${m.scope}`);
+    if (!state.first && !state.seen.has(m.id)) row.classList.add("new");
+
+    const top = el("div", "top");
+    top.append(scopePill(m.scope), el("span", "pill kind", m.kind));
+    top.append(el("span", "when", relTime(m.created_at)));
+    row.append(top, el("div", "content", m.content));
+
+    const meta = el("div", "meta");
+    const prov = el("span", "prov");
+    prov.append("by ", el("b", null, `${m.user_id} · ${m.agent_id}`), ` — ${m.team_name}`);
+    meta.append(prov);
+    if (m.tags) meta.append(el("span", null, `tags: ${m.tags}`));
+    if (m.promoted_by)
+      meta.append(el("span", "promoted",
+        `↑ promoted by ${m.promoted_by}` + (m.derived_from ? ` · derived from #${m.derived_from}` : "")));
+    row.append(meta);
+    return row;
+  }));
+
+  for (const m of all) state.seen.add(m.id);
+  state.first = false;
+}
+
+function approveForm(s) {
+  const box = el("div", "approve");
+  box.append(el("div", "alabel",
+    "generalized rewrite — approving publishes this as a global memory"));
+  const ta = el("textarea");
+  ta.value = s.content;
+  const row = el("div", "arow");
+  const btn = el("button", "chip approve-btn", "approve & promote");
+  const msg = el("span", "approve-msg");
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    msg.textContent = "";
+    try {
+      const res = await fetch(
+        `/ui/api/memories/${s.memory_id}/promote?viewer=${encodeURIComponent(state.viewer)}`,
+        { method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ generalized_content: ta.value.trim() || null }) });
+      if (!res.ok) {
+        let detail = `error ${res.status}`;
+        try { detail = (await res.json()).detail || detail; } catch (_) { /* keep status */ }
+        throw new Error(detail);
+      }
+      await refresh();
+    } catch (err) {
+      msg.textContent = String(err.message || err);
+      btn.disabled = false;
+    }
+  });
+  row.append(btn, msg);
+  box.append(ta, row);
+  return box;
+}
+
+function renderSuggestions(data) {
+  const sugs = data.suggestions;
+  const approver = !!(data.viewer && data.viewer.can_approve);
+  $("sug-count").textContent = sugs.length
+    ? (approver ? `${sugs.length} in review queue` : `${sugs.length} awaiting review`) : "";
+  const box = $("suggestions");
+  if (!sugs.length) {
+    const e = el("div", "empty");
+    if (approver) {
+      e.append("The org-wide review queue is empty — nothing demand-backed ",
+               "awaits approval. Candidates appear when a team's searches keep ",
+               "hitting a wall on another team's memory.");
+    } else {
+      e.append("No promotion candidates for ", el("b", null, state.viewer),
+               "'s teams. Candidates appear when another team's searches keep ",
+               "hitting a wall on a memory these teams own — blocked hits are the demand signal.");
+    }
+    box.replaceChildren(e);
+    return;
+  }
+  box.replaceChildren(...sugs.map((s) => {
+    const card = el("div", "sug");
+    const dc = el("div", "demand-count");
+    dc.append(el("div", "n", s.blocked_count), el("div", "l", "blocked hits"));
+    card.append(dc);
+
+    const body = el("div");
+    body.append(el("div", "scontent", s.content));
+    const row = el("div", "srow");
+    row.append(el("span", "pill kind", s.kind), el("span", null, `owned by ${s.team_name}`),
+               el("span", null, "· demanded by"));
+    for (const t of s.demand_teams.length ? s.demand_teams : ["(unknown)"])
+      row.append(el("span", "team-chip", t));
+    body.append(row);
+
+    if (approver) {
+      body.append(approveForm(s));
+    } else {
+      const hint = el("div", "hint");
+      hint.append("Approval happens in this console by an ",
+                  el("code", null, "ai-acceleration"),
+                  " reviewer with a generalized rewrite — demand teams are ",
+                  "named, their queries never disclosed.");
+      body.append(hint);
+    }
+    card.append(body);
+    return card;
+  }));
+}
+
+/* ---------- refresh loop ---------- */
+
+async function refresh() {
+  if (!state.viewer) return;
+  try {
+    const res = await fetch(`/ui/api/state?viewer=${encodeURIComponent(state.viewer)}`);
+    if (!res.ok) throw new Error(`state ${res.status}`);
+    const data = await res.json();
+    setLive(true, "live");
+    renderViewerCard(data.viewer);
+    renderTiles(data);
+    renderAgents(data);
+    renderScopeFilters();
+    renderMemories(data);
+    renderSuggestions(data);
+  } catch (err) {
+    setLive(false, "service unreachable");
+  }
+}
+
+(async function init() {
+  try {
+    await loadDirectory();
+  } catch (err) {
+    setLive(false, "service unreachable");
+    return;
+  }
+  await refresh();
+  setInterval(refresh, POLL_MS);
+})();
+</script>
+</body>
+</html>

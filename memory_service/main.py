@@ -13,6 +13,11 @@ Endpoints (all data endpoints require a bearer token = user+agent principal):
   GET    /v1/suggestions            the promotion digest for caller's teams
   GET    /v1/whoami                 principal identity
   GET    /healthz                   liveness
+
+Plus the read-only, loopback-only demo console (see ui.py):
+  GET    /ui                        the console page
+  GET    /ui/api/directory          org directory (feeds "view as")
+  GET    /ui/api/state              viewer-scoped snapshot
 """
 
 from contextlib import asynccontextmanager
@@ -23,6 +28,7 @@ from . import db
 from .auth import get_current_principal
 from .models import (MemoryOut, MemoryWrite, PromoteRequest, SearchRequest,
                      SuggestionOut, WhoAmI)
+from .ui import router as ui_router
 
 
 @asynccontextmanager
@@ -33,6 +39,7 @@ async def lifespan(_app: FastAPI):
 
 app = FastAPI(title="Recall — Scoped Agent Memory Service", version="1.0.0",
               lifespan=lifespan)
+app.include_router(ui_router)
 
 
 @app.get("/healthz")

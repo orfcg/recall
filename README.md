@@ -110,6 +110,23 @@ pytest        # 23 passed
 Interactive API docs: http://127.0.0.1:8000/docs (authorize with a value
 from `.tokens.json`).
 
+## Demo console (UI)
+
+http://127.0.0.1:8000/ui — a read-only dashboard for the live demo:
+registered agents, visible memories (with scope badges), and the
+promotion digest, auto-refreshing so memories appear as agents write
+them.
+
+The console has a **"view as"** selector instead of credentials: every
+read runs through the exact same visibility predicate as the agent API,
+evaluated as the selected directory user — switching between users
+makes the scoping walls visible (the demo's point). Guards for the
+credential-less demo: the console only answers loopback requests, and
+the viewer must be a seeded directory user. `resolve_viewer` in
+`memory_service/ui.py` is the seam where the production login
+(SSO/OIDC with users and roles) plugs in later without touching any
+query; the console itself performs no writes, promotions, or deletes.
+
 ## The demo installer sub-agent
 
 The repo ships a Claude Code sub-agent —

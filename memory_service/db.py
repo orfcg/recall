@@ -274,6 +274,64 @@ def delete_memory(conn, *, memory_id, user_id) -> bool:
     return cur.rowcount > 0
 
 
+# Governance: promotion approval is a scoped reviewer role — membership
+# in the AI Acceleration team. It grants exactly one extra capability
+# (approving demand-backed promotion candidates from the console), never
+# broader read or admin rights.
+APPROVER_TEAM = "ai-acceleration"
+
+# A candidate leaves the review queue once a global row derived from it
+# exists — approving is idempotent per original.
+NOT_YET_PROMOTED_SQL = (
+    "NOT EXISTS (SELECT 1 FROM memories g"
+    " WHERE g.derived_from = m.id AND g.scope = 'global')"
+)
+
+
+def is_promotion_approver(conn, user_id: str) -> bool:
+    row = conn.execute(
+        """SELECT 1 FROM user_teams ut JOIN teams t ON t.id = ut.team_id
+           WHERE ut.user_id = ? AND t.name = ?""",
+        (user_id, APPROVER_TEAM),
+    ).fetchone()
+    return row is not None
+
+
+def approve_promotion(conn, *, memory_id, approver_id,
+                      generalized_content=None):
+    """The console governance path: an APPROVER_TEAM member approves a
+    demand-backed candidate. Same rewrite semantics as promote_memory —
+    a NEW global row derived from the team original — with the approver
+    recorded in promoted_by. Raises PermissionError for non-approvers;
+    returns None when the memory is not an eligible candidate (unknown,
+    not team-scoped, no recorded demand, or already promoted)."""
+    if not is_promotion_approver(conn, approver_id):
+        raise PermissionError(
+            f"promotion approval requires membership in '{APPROVER_TEAM}'")
+    # SQL assembled from module constants only; all values are bound.
+    candidate_sql = f"""
+        SELECT m.* FROM memories m
+        WHERE m.id = :memory_id AND m.scope = 'team'
+          AND EXISTS (SELECT 1 FROM blocked_hits b WHERE b.memory_id = m.id)
+          AND {NOT_YET_PROMOTED_SQL}
+    """
+    src = conn.execute(candidate_sql, {"memory_id": memory_id}).fetchone()
+    if src is None:
+        return None
+    return insert_memory(
+        conn,
+        user_id=src["user_id"],          # original author provenance
+        agent_id=src["agent_id"],
+        team_id=src["team_id"],          # owning team retained for demote rights
+        scope="global",
+        kind=src["kind"],
+        content=generalized_content or src["content"],
+        tags=src["tags"],
+        derived_from=src["id"],
+        promoted_by=approver_id,
+    )
+
+
 def promote_memory(conn, *, memory_id, user_id, generalized_content=None):
     """Promotion is a rewrite, not a copy: a NEW global row derived from
     the team original, carrying promoted-by accountability. Only a member
@@ -320,7 +378,7 @@ def suggestions_for_user(conn, *, user_id, per_team_limit=3):
     NAMED; their queries and content are never disclosed.
     """
     # Fully parameterized; :user_id and :lim are bound values.
-    candidates_sql = """
+    candidates_sql = f"""
         SELECT m.id AS memory_id, m.content, m.kind, m.tags,
                t.name AS team_name, m.team_id,
                COUNT(b.id) AS blocked_count
@@ -329,13 +387,40 @@ def suggestions_for_user(conn, *, user_id, per_team_limit=3):
         JOIN teams t ON t.id = m.team_id
         WHERE m.scope = 'team'
           AND m.team_id IN (SELECT team_id FROM user_teams WHERE user_id = :user_id)
+          AND {NOT_YET_PROMOTED_SQL}
         GROUP BY m.id
         ORDER BY blocked_count DESC, m.id
         LIMIT :lim
     """
     candidates = conn.execute(
         candidates_sql, {"user_id": user_id, "lim": per_team_limit}).fetchall()
+    return _attach_demand_teams(conn, candidates)
 
+
+def promotion_queue(conn, *, limit=20):
+    """The approver's review queue (console, APPROVER_TEAM only): every
+    demand-backed, not-yet-promoted team candidate, org-wide. Approvers
+    see only what demand surfaced — never a general read over team
+    memories; the visibility predicate still governs everything else."""
+    # SQL assembled from module constants only; :lim is a bound value.
+    queue_sql = f"""
+        SELECT m.id AS memory_id, m.content, m.kind, m.tags,
+               t.name AS team_name, m.team_id,
+               COUNT(b.id) AS blocked_count
+        FROM memories m
+        JOIN blocked_hits b ON b.memory_id = m.id
+        JOIN teams t ON t.id = m.team_id
+        WHERE m.scope = 'team'
+          AND {NOT_YET_PROMOTED_SQL}
+        GROUP BY m.id
+        ORDER BY blocked_count DESC, m.id
+        LIMIT :lim
+    """
+    candidates = conn.execute(queue_sql, {"lim": limit}).fetchall()
+    return _attach_demand_teams(conn, candidates)
+
+
+def _attach_demand_teams(conn, candidates):
     out = []
     for c in candidates:
         demand = conn.execute(

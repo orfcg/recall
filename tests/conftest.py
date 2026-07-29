@@ -11,7 +11,8 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 def app_client(tmp_path, monkeypatch):
     """TestClient on a throwaway database.
 
-    Directory: team-a, team-b · u1∈{a}, u2∈{a,b}, u3∈{b}
+    Directory: team-a, team-b, ai-acceleration
+               u1∈{a}, u2∈{a,b}, u3∈{b}, u4∈{ai-acceleration} (approver)
     Agents:    a1(u1), a2(u2, with relevance profile), b1(u3)
     """
     db_path = str(tmp_path / "test.db")
@@ -19,7 +20,7 @@ def app_client(tmp_path, monkeypatch):
 
     for mod in ["memory_service.main", "memory_service.auth",
                 "memory_service.db", "memory_service.models",
-                "memory_service"]:
+                "memory_service.ui", "memory_service"]:
         sys.modules.pop(mod, None)
 
     from memory_service import db
@@ -30,11 +31,12 @@ def app_client(tmp_path, monkeypatch):
     db.init_db()
     tokens = {}
     with db.get_conn() as conn:
-        conn.execute("INSERT INTO teams (name) VALUES ('team-a'), ('team-b')")
+        conn.execute("INSERT INTO teams (name) VALUES ('team-a'), ('team-b'),"
+                     " ('ai-acceleration')")
         team_ids = {r["name"]: r["id"]
                     for r in conn.execute("SELECT id, name FROM teams")}
         users = {"u1": ["team-a"], "u2": ["team-a", "team-b"],
-                 "u3": ["team-b"]}
+                 "u3": ["team-b"], "u4": ["ai-acceleration"]}
         for uid, teams in users.items():
             conn.execute("INSERT INTO users (id, name) VALUES (?, ?)",
                          (uid, uid))

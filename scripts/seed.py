@@ -15,12 +15,15 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from memory_service import db
 
-TEAMS = ["sase-gateway", "sase-management", "sase-platform"]
+TEAMS = ["sase-gateway", "sase-management", "sase-platform",
+         "ai-acceleration"]
 
-# (user_id, display name, [teams])  — note bob is in TWO teams.
+# (user_id, display name, [teams]) — note bob spans multiple teams AND
+# holds the ai-acceleration membership, which is the scoped reviewer
+# role that may approve promotions from the console (db.APPROVER_TEAM).
 USERS = [
     ("alice", "Alice", ["sase-gateway"]),
-    ("bob", "Bob", ["sase-gateway", "sase-platform"]),
+    ("bob", "Bob", ["sase-gateway", "sase-platform", "ai-acceleration"]),
     ("carol", "Carol", ["sase-management"]),
 ]
 

@@ -1,0 +1,323 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Recall · demo runbook</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Spline+Sans+Mono:wght@400;500;600&family=Spline+Sans:wght@400;500&display=swap" rel="stylesheet">
+<style>
+  :root {
+    color-scheme: dark;
+    --bg:          #0c1210;
+    --panel:       #131b18;
+    --panel-2:     #182420;
+    --line:        rgba(236, 243, 238, 0.09);
+    --line-strong: rgba(236, 243, 238, 0.16);
+    --ink:         #ecf3ee;
+    --ink-2:       #aebfb6;
+    --muted:       #75897e;
+    --scope-team:   #3987e5;
+    --scope-global: #c98500;
+    --demand:       #ec835a;
+    --ok:           #0ca30c;
+    --serif: "Instrument Serif", Georgia, "Times New Roman", serif;
+    --mono:  "Spline Sans Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --sans:  "Spline Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+
+  body {
+    background:
+      radial-gradient(1100px 500px at 12% -8%, rgba(57, 135, 101, 0.10), transparent 60%),
+      radial-gradient(900px 600px at 105% 12%, rgba(201, 133, 0, 0.05), transparent 55%),
+      var(--bg);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: 15px;
+    line-height: 1.55;
+  }
+
+  body::before {
+    content: "";
+    position: fixed; inset: 0; pointer-events: none; z-index: 0; opacity: 0.05;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+
+  .frame { position: relative; z-index: 1; max-width: 860px; margin: 0 auto; padding: 28px 32px 90px; }
+
+  header {
+    display: flex; align-items: flex-end; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+    padding-bottom: 18px; border-bottom: 1px solid var(--line-strong);
+  }
+  .wordmark { font-family: var(--serif); font-style: italic; font-size: 40px; line-height: 1; }
+  .wordmark::after { content: "."; color: var(--scope-global); font-style: normal; }
+  .tagline { display: block; margin-top: 6px; font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); }
+  .backlink {
+    font-family: var(--mono); font-size: 12px; color: var(--ink-2); text-decoration: none;
+    border: 1px solid var(--line-strong); border-radius: 999px; padding: 6px 14px;
+    transition: color .15s, border-color .15s;
+  }
+  .backlink:hover { color: var(--ink); border-color: var(--ink-2); }
+
+  .lede { margin: 24px 0 8px; color: var(--ink-2); max-width: 62ch; }
+  .lede b { color: var(--ink); font-weight: 500; }
+  .windows { margin: 14px 0 0; padding: 0; list-style: none; font-family: var(--mono); font-size: 12.5px; color: var(--muted); }
+  .windows li { margin: 3px 0; }
+  .windows li::before { content: "— "; }
+  .windows b { color: var(--ink-2); font-weight: 500; }
+
+  /* ---------- acts ---------- */
+
+  .act { margin-top: 44px; }
+  .act-head { display: flex; align-items: baseline; gap: 14px; border-bottom: 1px solid var(--line); padding-bottom: 8px; margin-bottom: 14px; }
+  .act-no { font-family: var(--mono); font-size: 12px; letter-spacing: 0.1em; color: var(--muted); }
+  .act-title { font-family: var(--serif); font-weight: 400; font-size: 27px; margin: 0; }
+  .repo-chip {
+    margin-left: auto; flex: none;
+    font-family: var(--mono); font-size: 11.5px; color: var(--ink-2);
+    border: 1px solid var(--line-strong); border-radius: 6px; padding: 3px 10px;
+    white-space: nowrap;
+  }
+  .repo-chip::before { content: "session: "; color: var(--muted); }
+
+  .act p { color: var(--ink-2); max-width: 68ch; }
+  .act p b { color: var(--ink); font-weight: 500; }
+  .act code, .beat code { font-family: var(--mono); font-size: 0.92em; color: var(--ink); }
+
+  /* prompt card with copy button */
+  .prompt {
+    position: relative;
+    border: 1px solid var(--line); border-left: 3px solid var(--scope-team);
+    border-radius: 10px; background: var(--panel);
+    margin: 14px 0;
+  }
+  .prompt pre {
+    margin: 0; padding: 16px 96px 16px 18px;
+    font-family: var(--mono); font-size: 13.5px; line-height: 1.6;
+    white-space: pre-wrap; word-break: break-word; color: var(--ink);
+  }
+  .copy {
+    position: absolute; top: 10px; right: 10px;
+    display: inline-flex; align-items: center; gap: 7px;
+    font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em;
+    color: var(--muted); background: var(--panel-2);
+    border: 1px solid var(--line-strong); border-radius: 7px;
+    padding: 6px 10px; cursor: pointer;
+    transition: color .15s, border-color .15s;
+  }
+  .copy:hover { color: var(--ink); border-color: var(--ink-2); }
+  .copy .ico { font-size: 13px; line-height: 1; }
+  .copy.done { color: var(--ok); border-color: rgba(12, 163, 12, 0.5); }
+
+  /* console beat callout */
+  .beat {
+    display: flex; gap: 10px; align-items: flex-start;
+    border: 1px dashed var(--line-strong); border-radius: 10px;
+    padding: 12px 16px; margin: 14px 0;
+    font-size: 13.5px; color: var(--ink-2);
+  }
+  .beat .eye { flex: none; font-family: var(--mono); font-size: 10.5px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--scope-global); padding-top: 2px; }
+  .beat b { color: var(--ink); font-weight: 500; }
+
+  /* reset block */
+  .reset {
+    border: 1px solid var(--line); border-radius: 10px; background: var(--panel);
+    margin-top: 12px; position: relative;
+  }
+  .reset pre { margin: 0; padding: 14px 96px 14px 18px; font-family: var(--mono); font-size: 12.5px; line-height: 1.65; color: var(--ink-2); white-space: pre-wrap; }
+
+  .faq dt { font-family: var(--serif); font-size: 18px; margin-top: 16px; }
+  .faq dd { margin: 4px 0 0; color: var(--ink-2); max-width: 68ch; }
+
+  .reveal { animation: rise .5s ease-out both; }
+  @keyframes rise { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: none; } }
+
+  ::selection { background: rgba(201, 133, 0, 0.35); }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <div>
+      <span class="wordmark">Recall</span>
+      <span class="tagline">live demo &mdash; runbook</span>
+    </div>
+    <a class="backlink" href="/ui">&larr; console</a>
+  </header>
+
+  <p class="lede">The story: the gateway team's agent <b>learns something while
+  working</b>; the management team's agent <b>hits a wall</b> on it; the demand
+  signal drives a <b>governed promotion</b> approved in the console by
+  <b>bob</b> (AI Acceleration); the knowledge crosses teams.
+  Keep the console visible the whole time — it refreshes itself.</p>
+  <ul class="windows">
+    <li><b>repo/</b> — Claude Code on the Recall service</li>
+    <li><b>gateway-service/</b> — Claude Code, team sase-gateway (alice)</li>
+    <li><b>mgmt-portal/</b> — Claude Code, team sase-management (carol)</li>
+    <li><b>http://127.0.0.1:8000/ui</b> — the console, always on screen</li>
+  </ul>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">ACT 0</span><h2 class="act-title">Setup</h2><span class="repo-chip">repo/</span></div>
+    <p>Skip if the service is already running. The installer sub-agent handles
+    dependencies, tests, seeding, the service, and both demo repos.</p>
+    <div class="prompt"><pre>Set up the demo.</pre></div>
+    <div class="beat"><span class="eye">console</span><span>Open <code>http://127.0.0.1:8000/ui</code> — empty console, three users in
+    the "view as" selector, zero agents.</span></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">ACT 1</span><h2 class="act-title">Self-service onboarding</h2><span class="repo-chip">gateway-service/</span></div>
+    <div class="prompt"><pre>/add-agent</pre></div>
+    <p>Pick <b>Code reviewer</b> when asked.</p>
+    <div class="beat"><span class="eye">console</span><span>View as <b>alice</b>: the agent card appears under Agents the moment
+    the skill finishes — registered identity, relevance profile, zero memories.</span></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">ACT 2</span><h2 class="act-title">An agent learns while working</h2><span class="repo-chip">gateway-service/</span></div>
+    <div class="prompt"><pre>Implement call_upstream in gateway.py with our agreed retry policy: exponential backoff, max 3 retries — we chose backoff over a circuit breaker. One thing from last quarter's incident that keeps getting re-discovered in reviews: vendor X upstream calls sometimes vanish under load with NO error — a silent timeout, and it must be treated as retryable. When you're done, have the gw-code-reviewer sub-agent review the change against our conventions.</pre></div>
+    <p>The sub-agent bootstraps (empty — expected on a fresh install), reviews,
+    and at task completion <b>distills and writes</b>: a <code>decision</code>
+    (backoff over circuit breaker) and a <code>lesson</code> (vendor X silent
+    timeouts).</p>
+    <div class="beat"><span class="eye">console</span><span>View as <b>alice</b>: the memories flash into the feed with team-scope
+    badges. Switch to <b>carol</b>: nothing — the wall, live.</span></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">ACT 3</span><h2 class="act-title">The other team hits the wall</h2><span class="repo-chip">mgmt-portal/</span></div>
+    <div class="prompt"><pre>/add-agent</pre></div>
+    <p>Pick the repo default (or a role you like). Then:</p>
+    <div class="prompt"><pre>Implement sync_vendor_inventory in portal.py. We have a problem: calls to vendor X intermittently vanish without errors under load and we don't know why. Before you start, search our shared memory for anything about vendor X, silent timeouts, or retries.</pre></div>
+    <p>The search returns <b>nothing</b> — the lesson is team-scoped to
+    sase-gateway. No leak, no existence hint, and the blocked match was
+    recorded server-side as a <b>demand signal</b>.</p>
+    <div class="beat"><span class="eye">console</span><span>View as <b>carol</b>: still nothing. Switch to <b>alice</b>: the
+    <b>Promotion digest</b> now shows the vendor lesson with a blocked-hits
+    count and <i>sase-management named as the demanding team</i> — content
+    never disclosed to them.</span></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">ACT 4</span><h2 class="act-title">Governed promotion</h2><span class="repo-chip">console</span></div>
+    <p>Promotion approval is a scoped role, not admin: members of the
+    <b>ai-acceleration</b> team (<b>bob</b>) review the org-wide queue of
+    demand-backed candidates and approve from the console — everyone else
+    still only sees their own teams' digest.</p>
+    <div class="beat"><span class="eye">console</span><span>Switch the viewer to <b>bob</b> — a <b>promotion approver</b> badge
+    appears and the Promotion digest becomes the review queue. On the vendor-X
+    card, edit the generalized rewrite (strip anything gateway-specific so it
+    reads as an org-wide lesson) and click <b>approve &amp; promote</b>. A new
+    <b>global</b>-badged memory appears (promoted by <b>bob</b>, "derived from"
+    provenance), visible under <i>every</i> viewer — switch to <b>carol</b> to
+    prove it crossed the wall, and note the queue clears itself.</span></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">ACT 5</span><h2 class="act-title">The payoff</h2><span class="repo-chip">mgmt-portal/</span></div>
+    <div class="prompt"><pre>Search shared memory again for vendor X silent timeouts, and apply whatever you find to sync_vendor_inventory.</pre></div>
+    <p>The management agent now retrieves the gateway team's lesson and
+    implements retryable silent-timeout handling — months of someone else's
+    pain, <b>recalled instead of re-discovered</b>.</p>
+    <div class="beat"><span class="eye">console</span><span>One global memory, two teams, digest cleared.</span></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">EPILOGUE</span><h2 class="act-title">Control (optional)</h2><span class="repo-chip">gateway-service/</span></div>
+    <div class="prompt"><pre>Demote the promoted vendor lesson back to team scope.</pre></div>
+    <div class="beat"><span class="eye">console</span><span>As <b>carol</b>: it disappears — the owning team kept control; global
+    is a loan, not a giveaway. (A non-owner attempting this gets a 404 — worth
+    showing from <code>mgmt-portal/</code> first if there's time.)</span></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">RESET</span><h2 class="act-title">Between runs</h2><span class="repo-chip">repo/ (terminal)</span></div>
+    <div class="reset"><pre>rm -f memory.db .tokens.json
+.venv/bin/python scripts/seed.py
+rm -rf ../demo-repos
+.venv/bin/python scripts/create_demo_repos.py --dest ../demo-repos
+# restart the service (Ctrl-C the old uvicorn if still running):
+.venv/bin/uvicorn memory_service.main:app --port 8000</pre></div>
+  </section>
+
+  <section class="act reveal">
+    <div class="act-head"><span class="act-no">Q&amp;A</span><h2 class="act-title">Talking points if asked</h2></div>
+    <dl class="faq">
+      <dt>Why didn't carol's search leak anything?</dt>
+      <dd>One visibility predicate inside the single read path; direct fetch of
+      an invisible id is a 404 — existence never leaks.</dd>
+      <dt>Where are the credentials?</dt>
+      <dd>Simulated SSO: tokens minted at registration, only SHA-256 hashes
+      stored; plaintext lives in a gitignored chmod-600 tokens file read at
+      call time — never in a prompt, repo file, or the console.</dd>
+      <dt>Why does the console need no login?</dt>
+      <dd>Local, loopback-only, read-only, and every read is evaluated
+      <i>as</i> a directory user through the same predicate —
+      <code>resolve_viewer</code> is where SSO/roles plug in.</dd>
+    </dl>
+  </section>
+</div>
+
+<script>
+"use strict";
+
+/* Buttons are built with DOM methods and textContent only — no HTML
+   strings are ever injected. */
+
+async function copyText(text) {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch (err) {
+    // fallback for contexts where the async clipboard API is unavailable
+    const ta = document.createElement("textarea");
+    ta.value = text;
+    ta.style.position = "fixed";
+    ta.style.opacity = "0";
+    document.body.append(ta);
+    ta.select();
+    let ok = false;
+    try { ok = document.execCommand("copy"); } catch (e) { ok = false; }
+    ta.remove();
+    return ok;
+  }
+}
+
+function setButton(btn, icon, label, done) {
+  btn.querySelector(".ico").textContent = icon;
+  btn.querySelector(".lbl").textContent = label;
+  btn.classList.toggle("done", done);
+}
+
+for (const block of document.querySelectorAll(".prompt, .reset")) {
+  const btn = document.createElement("button");
+  btn.className = "copy";
+  btn.type = "button";
+  btn.setAttribute("aria-label", "Copy to clipboard");
+  const ico = document.createElement("span");
+  ico.className = "ico";
+  const lbl = document.createElement("span");
+  lbl.className = "lbl";
+  btn.append(ico, lbl);
+  setButton(btn, "⧉", "copy", false);
+
+  btn.addEventListener("click", async () => {
+    const ok = await copyText(block.querySelector("pre").textContent.trim());
+    setButton(btn, ok ? "✓" : "⧉", ok ? "copied" : "copy failed", ok);
+    setTimeout(() => setButton(btn, "⧉", "copy", false), 1600);
+  });
+  block.append(btn);
+}
+
+// gentle stagger on load
+document.querySelectorAll(".reveal").forEach((s, i) => {
+  s.style.animationDelay = `${Math.min(i * 60, 420)}ms`;
+});
+</script>
+</body>
+</html>
