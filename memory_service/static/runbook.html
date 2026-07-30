@@ -244,23 +244,6 @@ rm -rf ../demo-repos
 # restart the service (Ctrl-C the old uvicorn if still running):
 .venv/bin/uvicorn memory_service.main:app --port 8000</pre></div>
   </section>
-
-  <section class="act reveal">
-    <div class="act-head"><span class="act-no">Q&amp;A</span><h2 class="act-title">Talking points if asked</h2></div>
-    <dl class="faq">
-      <dt>Why didn't carol's search leak anything?</dt>
-      <dd>One visibility predicate inside the single read path; direct fetch of
-      an invisible id is a 404 — existence never leaks.</dd>
-      <dt>Where are the credentials?</dt>
-      <dd>Simulated SSO: tokens minted at registration, only SHA-256 hashes
-      stored; plaintext lives in a gitignored chmod-600 tokens file read at
-      call time — never in a prompt, repo file, or the console.</dd>
-      <dt>Why does the console need no login?</dt>
-      <dd>Local, loopback-only, read-only, and every read is evaluated
-      <i>as</i> a directory user through the same predicate —
-      <code>resolve_viewer</code> is where SSO/roles plug in.</dd>
-    </dl>
-  </section>
 </div>
 
 <script>
